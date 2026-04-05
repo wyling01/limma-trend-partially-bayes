@@ -54,13 +54,19 @@ func_plot_modified <- function(plot){
 
 
 # Trend plot
-posterior_log_sigma2 <- function(a, k, prior_tbl) {
+posterior_weights_2d <- function(a, k, prior_tbl) {
   logw <- log(prior_tbl$prob) +
-    dnorm(a, mean = prior_tbl$mu,
+    dnorm(a,
+          mean = prior_tbl$mu,
           sd   = sqrt(prior_tbl$sigma2 / k),
           log  = TRUE)
   m <- max(logw)
-  w <- exp(logw - m); w <- w / sum(w)
+  w <- exp(logw - m)
+  w / sum(w)
+}
+
+posterior_log_sigma2 <- function(a, k, prior_tbl) {
+  w <- posterior_weights_2d(a, k, prior_tbl)
   sum(w * log(prior_tbl$sigma2))
 }
 
@@ -99,7 +105,7 @@ make_trend_plot <- function(trend_data){
     ylim(min(trend_data$var),max(trend_data$var)+1)+
     labs(
       x = expression(bold(A[i])),
-      y = expression(bold(E(log(S^2) ~ "|" ~ A[i] == a))),
+      y = expression(bold(log(S^2))),
       color = NULL
     ) +
     scale_color_manual(
@@ -374,7 +380,7 @@ make_trend_plot_mimic_joint <- function(info,mimic_joint_npmle_prior,pep_grp){
     geom_line(aes(y = E_S2, group = 1, color = "Joint-NPMLE"), linewidth = 1.2) +
     labs(
        x = expression(bold(log[2](count))),
-       y = expression(bold(E(log(S^2) ~ "|" ~ M[i] == m))),
+       y = expression(bold(log(S^2))),
       color = NULL
     ) +
     scale_color_manual(
