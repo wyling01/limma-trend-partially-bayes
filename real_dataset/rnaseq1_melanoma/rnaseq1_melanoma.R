@@ -110,10 +110,15 @@ sum(BH_adjust(result$reg_invchi,alpha)) # 133
 sum(BH_adjust(result$reg_npmle,alpha)) # 76
 sum(BH_adjust(result$joint_npmle,alpha)) # 106
 
+#save(info,prior_result, file = "data/plot_ready_data_rnaseq1.RData")
+
 # Plot
 
+#load("data/plot_ready_data_rnaseq1.RData")
+
 ## Trend plot
-trend_data <- make_trend_data(info,prior_result)
+x_rnaseq <- expression(bold(A[i])~"(avg. intensity)")
+plot_trend<- make_trend_plot(trend_data,0.2,x_rnaseq)
 plot_trend <- make_trend_plot(trend_data)
 plot_trend <- func_plot_modified(plot_trend)
 

@@ -85,35 +85,43 @@ make_trend_data <- function(info,prior_result){
     info$A,
     function(ai) posterior_logS2(ai, info$K, info$df, prior_trend2d_df)
   )
+  log_var_fitted_untrended <- (log(prior_result$untrended_invchi$s02*prior_result$untrended_invchi$d0/info$df)
+                               +digamma(info$df/2)-digamma(prior_result$untrended_invchi$d0/2))
   result_combined_df <- tibble(A = info$A,
-                               var = log(info$var),
-                               var_fitted = info$emean,
-                               E_S2 = E_logS2_given_A)
+                               log_sample_var = log(info$var),
+                               log_var_fitted = info$emean,
+                               E_log_S2 = E_logS2_given_A,
+                               log_var_fitted_untrended = log_var_fitted_untrended)
   return(result_combined_df)
 }
 
-make_trend_plot <- function(trend_data){
+make_trend_plot <- function(trend_data,alpha,xlab){
   plot_trend<- ggplot(trend_data, aes(x = A)) +
     ## raw log-variance points (neutral, no legend)
-    geom_point(aes(y = var), color = "grey70", alpha = 0.6,shape=16,stroke = 0) +
+    geom_point(aes(y = log_sample_var), color = "#AAAAAA", alpha = alpha,shape=16,stroke = 0,size=1) +
     ## fitted trend line
-    geom_line(aes(y = var_fitted, group = 1, color = "Fitted trend"), linewidth = 1.2) +
+    geom_line(aes(y = log_var_fitted, group = 1, color = "Fitted trend"), size = 1.5,lineend = "round") +
     
     ## posterior expectation points (Joint NPMLE)
-    geom_point(aes(y = E_S2), color = "lightblue", size = 0.5,alpha=0.5) +
-    geom_line(aes(y = E_S2, group = 1, color = "Joint-NPMLE"), linewidth = 1.2) +
-    ylim(min(trend_data$var),max(trend_data$var)+1)+
+    #geom_point(aes(y = E_log_S2), color = "lightblue", size = 0.5,alpha=0.5) +
+    geom_line(aes(y = E_log_S2, group = 1, color = "Joint-NPMLE"), size = 1.5,lineend = "round") +
+    geom_hline(
+      aes(yintercept = log_var_fitted_untrended, color = "Constant trend"),
+      size = 1.5,
+      linetype = "22"
+    ) +
+    ylim(min(trend_data$log_sample_var),max(trend_data$log_sample_var)+1)+
     labs(
-      x = expression(bold(A[i])),
+      x = xlab,
       y = expression(bold(log(S^2))),
       color = NULL
     ) +
     scale_color_manual(
-      values = c( "Fitted trend" = "#FB8072","Joint-NPMLE" = "#377EB8"),
-      breaks = c( "Fitted trend","Joint-NPMLE"),
+      values = c("Constant trend"="grey40", "Fitted trend" = "#D55E00","Joint-NPMLE" = "#377EB8"),
+      breaks = c("Constant trend","Fitted trend","Joint-NPMLE"),
       name = NULL
     ) +
-    theme_minimal()
+    theme_classic(base_size = 10)
   
   plot_trend
 }
@@ -359,36 +367,43 @@ E_logS2_given_Mi <- function(pep_grp, prior_byM, df1) {
   return(E_logS2_i)
 }
 
-make_trend_plot_mimic_joint <- function(info,mimic_joint_npmle_prior,pep_grp){
+make_trend_plot_mimic_joint <- function(info,prior_result,pep_grp,alpha,xlab){
   df<- info$df
-  E_logS2_Mi <- E_logS2_given_Mi(pep_grp, mimic_joint_npmle_prior, df)
-  
+  E_logS2_Mi <- E_logS2_given_Mi(pep_grp, prior_result$mimic_joint_npmle, df)
+  log_var_fitted_untrended <- (log(prior_result$untrended_invchi$s02*prior_result$untrended_invchi$d0/info$df)
+                               +digamma(info$df/2)-digamma(prior_result$untrended_invchi$d0/2))
   result_combined_df <- tibble(A = info$A,
-                    var = log(info$var),
-                    var_fitted = info$emean,
-                    E_S2 = E_logS2_Mi)
+                    log_sample_var = log(info$var),
+                    log_var_fitted = info$emean,
+                    E_log_S2 = E_logS2_Mi,
+                    log_var_fitted_untrended = log_var_fitted_untrended)
   
   
   plot_trend <- ggplot(result_combined_df, aes(x = A)) +
     ## raw log-variance points (neutral, no legend)
-    geom_point(aes(y = var), color = "grey70", alpha = 0.6,shape=16,stroke = 0) +
+    geom_point(aes(y = log_sample_var), color = "#AAAAAA", alpha = alpha,shape=16,stroke = 0,size=1) +
     ## fitted trend line
-    geom_line(aes(y = var_fitted, group = 1, color = "Fitted trend"), linewidth = 1.2) +
+    geom_line(aes(y = log_var_fitted, group = 1, color = "Fitted trend"), size = 1.5,lineend = "round") +
   
     ## posterior expectation points (Joint NPMLE)
-    geom_point(aes(y = E_S2), color = "lightblue",size = 0.5,alpha=0.5) +
-    geom_line(aes(y = E_S2, group = 1, color = "Joint-NPMLE"), linewidth = 1.2) +
+    #geom_point(aes(y = E_S2), color = "lightblue",size = 0.5,alpha=0.5) +
+    geom_line(aes(y = E_log_S2, group = 1, color = "Joint-NPMLE"), size = 1.5,lineend = "round") +
+    geom_hline(
+      aes(yintercept = log_var_fitted_untrended, color = "Constant trend"),
+      size = 1.5,
+      linetype = "22"
+    ) +
     labs(
-       x = expression(bold(log[2](count))),
+       x = xlab,
        y = expression(bold(log(S^2))),
       color = NULL
     ) +
     scale_color_manual(
-      values = c( "Fitted trend" = "#FB8072","Joint-NPMLE" = "#377EB8"),
-      breaks = c( "Fitted trend","Joint-NPMLE"),
+      values = c( "Constant trend"="grey40", "Fitted trend" = "#D55E00","Joint-NPMLE" = "#377EB8"),
+      breaks = c( "Constant trend","Fitted trend","Joint-NPMLE"),
       name = NULL
     ) +
-    theme_minimal()
+     theme_classic(base_size = 10)
   
   plot_trend
 }

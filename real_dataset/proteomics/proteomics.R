@@ -149,16 +149,22 @@ table(pep_grp)
 
 # Estimating prior
 mimic_joint_npmle_prior <- prior_mimic_joint_npmle(info,pep_grp,v=80,verbose = FALSE)
+prior_result$mimic_joint_npmle<-mimic_joint_npmle_prior
 
 # P value calculation
 P_list_mimic_joint_npmle <- P_value_mimic_joint_npmle(info,mimic_joint_npmle_prior,pep_grp,contrast_name=1)
 result$mimic_joint_npmle <- P_list_mimic_joint_npmle
 sum(BH_adjust(P_list_mimic_joint_npmle,alpha))
 
-# -----Mimic-joint-npmle plot-----
-## trend plot
+#save(info,prior_result, file = "data/plot_ready_data_proteomics.RData")
 
-plot_trend_mimic_joint <- make_trend_plot_mimic_joint(info,mimic_joint_npmle_prior,pep_grp)
+# -----Mimic-joint-npmle plot-----
+
+#load("data/plot_ready_data_proteomics.RData")
+
+## trend plot
+x_proteome <- expression(bold(M[i])~"(" * log[2] * " peptide counts)")
+plot_trend_mimic_joint<- make_trend_plot_mimic_joint(info,prior_result,pep_grp,0.6,x_proteome)
 plot_trend_mimic_joint <- func_plot_modified(plot_trend_mimic_joint)
 
 #ggsave(filename = "./figure/combined_trend.pdf", plot = plot_trend_mimic_joint, width = 20, height = 6, dpi = 300)

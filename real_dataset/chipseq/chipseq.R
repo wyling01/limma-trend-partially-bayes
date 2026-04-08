@@ -74,11 +74,16 @@ sum(BH_adjust(result$reg_invchi,alpha)) # 4638
 sum(BH_adjust(result$reg_npmle,alpha)) # 4620
 sum(BH_adjust(result$joint_npmle,alpha)) # 5674
 
+#save(info,prior_result, file = "data/plot_ready_data_chipseq.RData")
+
 # Plot
+
+#load("data/plot_ready_data_chipseq.RData")
 
 ## Trend plot
 trend_data <- make_trend_data(info,prior_result)
-plot_trend <- make_trend_plot(trend_data)
+x_chipseq  <- expression(bold(A[i])~"(avg. intensity)")
+plot_trend<- make_trend_plot(trend_data,0.17,x_chipseq)
 plot_trend <- func_plot_modified(plot_trend)
 
 ## Marginal S
