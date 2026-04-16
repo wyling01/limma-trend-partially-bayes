@@ -232,16 +232,16 @@ plot_marginal_S <- make_marginal_S_plot(marginal_S_data,info,xlim_R =5)
 plot_marginal_S <- func_plot_modified(plot_marginal_S)
 
 ## Prior sigma
-plot_prior_sigma <- make_prior_sigma_plot(prior_result,scale_factor=5,xlim_R =7)
+plot_prior_sigma <- make_prior_sigma_plot(prior_result,scale_factor=5,xlim_R =6)
 plot_prior_sigma <- func_plot_modified(plot_prior_sigma)
 
 ## Marginal V
 marginal_V_data <- make_marginal_V_data(info,prior_result)
-plot_marginal_V <- make_marginal_V_plot(marginal_V_data,info,xlim_R =10)
+plot_marginal_V <- make_marginal_V_plot(marginal_V_data,info,xlim_R =6)
 plot_marginal_V <- func_plot_modified(plot_marginal_V)
 
 ## Prior tau
-plot_prior_tau <- make_prior_tau_plot(prior_result,scale_factor=3,xlim_R =7)
+plot_prior_tau <- make_prior_tau_plot(prior_result,scale_factor=3,xlim_R =6)
 plot_prior_tau <- func_plot_modified(plot_prior_tau)
 
 ## Joint prior

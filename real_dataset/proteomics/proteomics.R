@@ -67,7 +67,7 @@ load("./data/filtered_data_proteomics.RData")
 
 
 info <- info_extractor(data_proteomics,M=data_proteomics$M)
-
+info$pep_num <- data_proteomics$pep_num
 
 
 ## Prior estimation
@@ -99,7 +99,7 @@ sum(BH_adjust(result$reg_npmle,alpha))
 
 ## Marginal S
 marginal_S_data <- make_marginal_S_data(info,prior_result,include_joint = FALSE)
-plot_marginal_S <- make_marginal_S_plot(marginal_S_data,info,xlim_R =0.2,include_joint = FALSE)
+plot_marginal_S <- make_marginal_S_plot(marginal_S_data,info,xlim_R =0.1,include_joint = FALSE)
 plot_marginal_S <- func_plot_modified(plot_marginal_S)
 
 ## Prior sigma
@@ -108,11 +108,11 @@ plot_prior_sigma <- func_plot_modified(plot_prior_sigma)
 
 ## Marginal V
 marginal_V_data <- make_marginal_V_data(info,prior_result)
-plot_marginal_V <- make_marginal_V_plot(marginal_V_data,info,xlim_R =10)
+plot_marginal_V <- make_marginal_V_plot(marginal_V_data,info,xlim_R =7.5)
 plot_marginal_V <- func_plot_modified(plot_marginal_V)
 
 ## Prior tau
-plot_prior_tau <- make_prior_tau_plot(prior_result,scale_factor=1.5,xlim_R =10)
+plot_prior_tau <- make_prior_tau_plot(prior_result,scale_factor=1.5,xlim_R =8)
 plot_prior_tau <- func_plot_modified(plot_prior_tau)
 
 
@@ -156,14 +156,14 @@ P_list_mimic_joint_npmle <- P_value_mimic_joint_npmle(info,mimic_joint_npmle_pri
 result$mimic_joint_npmle <- P_list_mimic_joint_npmle
 sum(BH_adjust(P_list_mimic_joint_npmle,alpha))
 
-#save(info,prior_result, file = "data/plot_ready_data_proteomics.RData")
+#save(info,prior_result,result, file = "data/plot_ready_data_proteomics.RData")
 
 # -----Mimic-joint-npmle plot-----
 
 #load("data/plot_ready_data_proteomics.RData")
 
 ## trend plot
-x_proteome <- expression(bold(M[i])~"(" * log[2] * " peptide counts)")
+x_proteome <- expression(bold(M[i])~"(" * "peptide counts)")
 plot_trend_mimic_joint<- make_trend_plot_mimic_joint(info,prior_result,pep_grp,0.6,x_proteome)
 plot_trend_mimic_joint <- func_plot_modified(plot_trend_mimic_joint)
 
@@ -173,7 +173,7 @@ plot_trend_mimic_joint <- func_plot_modified(plot_trend_mimic_joint)
 out <- summary_significance_pep_grp(result,pep_grp)
 p_bar <- ggplot(out$df_sum, aes(x = M, y = sig, fill = method)) +
   geom_col(position = position_dodge(width = 0.65), width = 0.6,alpha = 0.8,color = "black",linewidth = 0.4) +
-  labs(x = expression(bold(M)),y = expression(bold("# significant discoveries")),fill = NULL) +
+  labs(x = expression(bold(M[i])),y = expression(bold("# significant discoveries")),fill = NULL) +
   scale_fill_manual(
     values = c("gray40","mediumpurple4","lightcoral","lightsalmon1","aquamarine3","#377EB8"),
     breaks = c("t","untrend","untrend_1d","trend","trend_1d","trend_2d"),
@@ -188,10 +188,10 @@ p_bar_final <- func_plot_modified(p_bar)
 ## Prop-significance plot
 
 p_prop <- ggplot(out$df_prop, aes(x = M, y = prop, color = method, group = method,shape=method)) +
-  geom_line(linewidth = 1) +
+  geom_line(size = 1.5) +
   geom_point(size = 2) +
   scale_y_continuous(labels = percent_format(accuracy = 1),expand = expansion(mult = c(0, 0.3))) +
-  labs(x = expression(bold(M)), y = "Proportion of significance",color = NULL) +
+  labs(x = expression(bold(M[i])), y = "Proportion of significance",color = NULL) +
   scale_color_manual(
     values = c("gray40","mediumpurple4","lightcoral","lightsalmon1","aquamarine3","#377EB8"),
     breaks = c("t","untrend","untrend_1d","trend","trend_1d","trend_2d"),
@@ -259,7 +259,7 @@ make_one_bin_plot <- function(g, show_x = FALSE) {
 
 plist <- lapply(seq_along(bins), \(j) make_one_bin_plot(bins[j], show_x = (j == length(bins))))
 p_stack <- wrap_plots(plist, ncol = 1) + plot_layout(heights = rep(1, length(plist)))
-ylab_col <- wrap_elements(full = textGrob("M", rot = 90,
+ylab_col <- wrap_elements(full = textGrob(expression(M[i]), rot = 90,
                                          gp = gpar(fontface = "bold", fontsize = 14)))
 p_with_ylab <- ylab_col + p_stack + plot_layout(widths = c(0.08, 1))
 
@@ -281,4 +281,4 @@ add_panel_border <- function(p, col = "black", lwd = 2) {
 g_stack_bordered <- add_panel_border(p_stack, lwd = 2)
 p_stack_bordered  <- wrap_elements(full = g_stack_bordered)
 mimic_prior_final <- ylab_col + p_stack_bordered + plot_layout(widths = c(0.01, 1))
-#ggsave(filename = "./figure/mimic-joint-prior.pdf", plot = mimic_prior_final, width = 8, height = 6, dpi = 300)
+#ggsave(filename = "./figure/mimic-joint-prior.pdf", plot = mimic_prior_final, width = 4.5, height = 11, dpi = 300)

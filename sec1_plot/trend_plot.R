@@ -84,21 +84,21 @@ x_rnaseq   <- expression(bold(A[i])~"(avg. intensity)")
 x_chipseq  <- expression(bold(A[i])~"(avg. intensity)")
 x_proteome <- expression(bold(M[i])~"(" * log[2] * " peptide counts)")
 
-q <- quantile(rnaseq1_trend_data$M,0.99)
+q <- quantile(rnaseq1_trend_data$M,0.999)
 rnaseq1_trend_data_filter <- filter(rnaseq1_trend_data, M <= q)
 p_rnaseq1 <- make_trend_panel(rnaseq1_trend_data_filter, 0.2, xlab = x_rnaseq)
 
 p_rnaseq2 <- make_trend_panel(rnaseq2_trend_data, 0.8, xlab = x_rnaseq, ylab=NULL) +  theme(legend.position = "none")
 
-q_chipseq_low <- quantile(chipseq_trend_data$M, 0.01)
+q_chipseq_low <- quantile(chipseq_trend_data$M, 0)
 q_chipseq_hi <- quantile(chipseq_trend_data$M, 0.99)
 chipseq_trend_data_filt <- filter(chipseq_trend_data, M <= q_chipseq_hi, M >= q_chipseq_low)
 p_chipseq   <- make_trend_panel(chipseq_trend_data_filt, 0.17, xlab = x_chipseq, ylab=NULL) + theme(legend.position = "none")
 
-q_proteome <- quantile(proteomic_trend_data$M, 0.99)
+q_proteome <- quantile(proteomic_trend_data$M, 0.999)
 proteomic_trend_data_filt <- filter(proteomic_trend_data, M <= q_proteome)
 
-p_proteome  <- make_trend_panel(proteomic_trend_data_filt,0.6, xlab = x_proteome, ylab=NULL) + theme(legend.position = "none")
+p_proteome  <- make_trend_panel(proteomic_trend_data_filt,0.6, xlab = x_proteome, ylab=NULL) + theme(legend.position = "none") + scale_x_continuous(trans = scales::log2_trans())
 
 #save_panel(p_rnaseq1,   "panel1rnaseq1", w = 4.2, h = 3)
 #save_panel(p_rnaseq2,   "panel2rnaseq2", w = 4, h = 3)

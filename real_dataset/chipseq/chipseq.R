@@ -83,25 +83,27 @@ sum(BH_adjust(result$joint_npmle,alpha)) # 5674
 ## Trend plot
 trend_data <- make_trend_data(info,prior_result)
 x_chipseq  <- expression(bold(A[i])~"(avg. intensity)")
-plot_trend<- make_trend_plot(trend_data,0.17,x_chipseq)
+q_chipseq_hi <- quantile(trend_data$A, 0.999)
+trend_data_filt <- filter(trend_data, A <= q_chipseq_hi)
+plot_trend<- make_trend_plot(trend_data_filt,0.17,x_chipseq)
 plot_trend <- func_plot_modified(plot_trend)
 
 ## Marginal S
 marginal_S_data <- make_marginal_S_data(info,prior_result)
-plot_marginal_S <- make_marginal_S_plot(marginal_S_data,info,xlim_R =0.5)
+plot_marginal_S <- make_marginal_S_plot(marginal_S_data,info,xlim_R =0.4)
 plot_marginal_S <- func_plot_modified(plot_marginal_S)
 
 ## Prior sigma
-plot_prior_sigma <- make_prior_sigma_plot(prior_result,scale_factor=50,xlim_R =1)
+plot_prior_sigma <- make_prior_sigma_plot(prior_result,scale_factor=50,xlim_R =1.1)
 plot_prior_sigma <- func_plot_modified(plot_prior_sigma)
 
 ## Marginal V
 marginal_V_data <- make_marginal_V_data(info,prior_result)
-plot_marginal_V <- make_marginal_V_plot(marginal_V_data,info,xlim_R =10)
+plot_marginal_V <- make_marginal_V_plot(marginal_V_data,info,xlim_R=8)
 plot_marginal_V <- func_plot_modified(plot_marginal_V)
 
 ## Prior tau
-plot_prior_tau <- make_prior_tau_plot(prior_result,scale_factor=1.6,xlim_R =7.5)
+plot_prior_tau <- make_prior_tau_plot(prior_result,scale_factor=1.6,xlim_R=6)
 plot_prior_tau <- func_plot_modified(plot_prior_tau)
 
 ## Joint prior
