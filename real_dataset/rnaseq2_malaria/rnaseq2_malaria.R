@@ -11,8 +11,8 @@ library(data.table)
 library(pheatmap)
 
 # -----Load Function-----
-source('../function/func_limma_trend.R')
-source('../function/func_plot.R')
+source('../../function/func_limma_trend.R')
+source('../../function/func_plot.R')
 # -----Data Preprocessing-----
 
 ## ---Load gene ID mappings

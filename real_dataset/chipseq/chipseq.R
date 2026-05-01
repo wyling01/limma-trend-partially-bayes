@@ -4,8 +4,8 @@ library(readxl)
 
 
 # -----Load Function-----
-source('../function/func_limma_trend.R')
-source('../function/func_plot.R')
+source('../../function/func_limma_trend.R')
+source('../../function/func_plot.R')
 # -----Data Preprocessing-----
 
 ## Read data.

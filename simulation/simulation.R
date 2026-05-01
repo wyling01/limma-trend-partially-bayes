@@ -444,7 +444,9 @@ df_fdr$df_f <- factor(df_fdr$df, levels = c(2,4,8,16))
 df_tpr <- subset(sum_df_invchi_type1, metric == "TPR")
 df_tpr$df_f <- factor(df_tpr$df, levels = c(2,4,8,16))
 
-plot_fdr_invchi_type1 <- plot_fdr(df_fdr)
+plot_fdr_invchi_type1 <- plot_fdr(df_fdr) +
+  labs(title = expression(bold("Scaled Inv" * chi^2))) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold",size = 30)) 
 plot_tpr_invchi_type1 <- plot_tpr(df_tpr)
 
 ## Sclaed inverse chi^2 Type 2
@@ -463,7 +465,9 @@ df_fdr$df_f <- factor(df_fdr$df, levels = c(2,4,8,16))
 df_tpr <- subset(sum_df_invchi_type2, metric == "TPR")
 df_tpr$df_f <- factor(df_tpr$df, levels = c(2,4,8,16))
 
-plot_fdr_invchi_type2 <- plot_fdr(df_fdr)
+plot_fdr_invchi_type2 <- plot_fdr(df_fdr) +
+  labs(title = expression(bold("Scaled Inv" * chi^2))) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold",size = 30)) 
 plot_tpr_invchi_type2 <- plot_tpr(df_tpr)
 
 ## Dirac Type 1

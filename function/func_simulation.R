@@ -213,17 +213,18 @@ P_value_map_modified <- function(info,contrast_name=NULL){
   n <- info$n
   
   if (is.null(contrast_name)){
-    stdev.unscaled <- fit_contrasts$stdev.unscaled[,1]
-    Z <- fit_contrasts$coefficients[,1]
+      stdev.unscaled <- fit_contrasts$stdev.unscaled[,1]
+      Z <- fit_contrasts$coefficients[,1]
   }else{
-    stdev.unscaled <- fit_contrasts$stdev.unscaled[,contrast_name]
-    Z <- fit_contrasts$coefficients[,contrast_name]
+      stdev.unscaled <- fit_contrasts$stdev.unscaled[,contrast_name]
+      Z <- fit_contrasts$coefficients[,contrast_name]
   }
-  sigma2_hat <- exp(info$emean)
+  correction <- digamma(df / 2) - log(df / 2)
+  sigma2_hat <- exp(info$emean - correction)
   
   se_hat <- sqrt(sigma2_hat) * stdev.unscaled
   z <- Z / se_hat
-
+  
   pval <- 2 * pnorm(-abs(z))
   pval
 }

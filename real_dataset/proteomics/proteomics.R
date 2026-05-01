@@ -7,8 +7,8 @@ library(grid)
 library(scales)
 
 # -----Load Function-----
-source('../function/func_limma_trend.R')
-source('../function/func_plot.R')
+source('../../function/func_limma_trend.R')
+source('../../function/func_plot.R')
 # -----Data Preprocessing-----
 
 ## Download data
@@ -175,7 +175,7 @@ p_bar <- ggplot(out$df_sum, aes(x = M, y = sig, fill = method)) +
   geom_col(position = position_dodge(width = 0.65), width = 0.6,alpha = 0.8,color = "black",linewidth = 0.4) +
   labs(x = expression(bold(M[i])),y = expression(bold("# significant discoveries")),fill = NULL) +
   scale_fill_manual(
-    values = c("gray40","mediumpurple4","lightcoral","lightsalmon1","aquamarine3","#377EB8"),
+    values = c("gray40","lightsalmon1","aquamarine3","mediumpurple4","lightcoral","#377EB8"),
     breaks = c("t","untrend","untrend_1d","trend","trend_1d","trend_2d"),
     labels = c("t-test",expression(bold("Untrended-Inv"*chi^2)), "Untrended-NPMLE", expression(bold("Reg-Inv"*chi^2)),
                "Reg-NPMLE$","Joint-NPMLE")
@@ -193,7 +193,7 @@ p_prop <- ggplot(out$df_prop, aes(x = M, y = prop, color = method, group = metho
   scale_y_continuous(labels = percent_format(accuracy = 1),expand = expansion(mult = c(0, 0.3))) +
   labs(x = expression(bold(M[i])), y = "Proportion of significance",color = NULL) +
   scale_color_manual(
-    values = c("gray40","mediumpurple4","lightcoral","lightsalmon1","aquamarine3","#377EB8"),
+    values = c("gray40","lightsalmon1","aquamarine3","mediumpurple4","lightcoral","#377EB8"),
     breaks = c("t","untrend","untrend_1d","trend","trend_1d","trend_2d"),
     labels = c("t-test",expression(bold("Untrended-Inv"*chi^2)),"Untrended-NPMLE", expression(bold("Reg-Inv"*chi^2)),
                "Reg-NPMLE","Joint-NPMLE") ) +

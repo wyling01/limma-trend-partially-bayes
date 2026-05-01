@@ -279,7 +279,7 @@ make_marginal_V_plot<- function(marginal_V_data,info,xlim_R = 1,line_size=1.5){
     geom_line(data = marginal_V_data, aes(x = x, y = y_reg_npmle , color = "Reg-NPMLE"), size = line_size, lineend = "round") +
     geom_line(data = marginal_V_data, aes(x = x, y = y_reg_invchi , color = "Reg-Inv"), size = line_size, lineend = "round") +
     xlim(0, xlim_R) +
-    labs( x = expression(bold(V[i]^2)), y = "Density") +
+    labs( x = expression(bold(hat(V)[i]^2)), y = "Density") +
     scale_fill_manual(values = c("Histogram" = "grey"), name = NULL) +  # Legend for histogram
     scale_color_manual(
       values = c( "Reg-Inv" = "mediumpurple4","Reg-NPMLE" = "lightcoral"),
