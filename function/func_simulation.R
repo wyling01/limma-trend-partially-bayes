@@ -7,6 +7,7 @@ library(patchwork)
 library(stringr)
 library(viridis)
 library(RColorBrewer) 
+library(MAnorm2)
 
 # FDR-TPR
 fdr_tpr_09 <- function(significance, n){
@@ -207,43 +208,45 @@ P_value_oracle_discrete <- function(info,oracle_psi,value_true = c(1,10), probab
 
 # MAP (modified)
 P_value_map_modified <- function(info,contrast_name=NULL){
-  fit_contrasts <- info$fit_contrasts
-  df <- info$df
-  var <- info$var
-  n <- info$n
-  
-  if (is.null(contrast_name)){
-      stdev.unscaled <- fit_contrasts$stdev.unscaled[,1]
-      Z <- fit_contrasts$coefficients[,1]
-  }else{
-      stdev.unscaled <- fit_contrasts$stdev.unscaled[,contrast_name]
-      Z <- fit_contrasts$coefficients[,contrast_name]
-  }
-  correction <- digamma(df / 2) - log(df / 2)
-  sigma2_hat <- exp(info$emean - correction)
-  
-  se_hat <- sqrt(sigma2_hat) * stdev.unscaled
-  z <- Z / se_hat
-  
-  pval <- 2 * pnorm(-abs(z))
-  pval
+    fit_contrasts <- info$fit_contrasts
+    df <- info$df
+    var <- info$var
+    n <- info$n
+    
+    if (is.null(contrast_name)){
+        stdev.unscaled <- fit_contrasts$stdev.unscaled[,1]
+        Z <- fit_contrasts$coefficients[,1]
+    }else{
+        stdev.unscaled <- fit_contrasts$stdev.unscaled[,contrast_name]
+        Z <- fit_contrasts$coefficients[,contrast_name]
+    }
+    correction <- digamma(df / 2) - log(df / 2)
+    sigma2_hat <- exp(info$emean - correction)
+    
+    se_hat <- sqrt(sigma2_hat) * stdev.unscaled
+    z <- Z / se_hat
+    
+    pval <- 2 * pnorm(-abs(z))
+    pval
 }
 
 # -----Plot-----
 # Simulation plot
 
-make_summary_df <- function(mat, df_val) {
+make_summary_df <- function(mat, df_val, keep_methods) {
   rm <- rowMeans(mat, na.rm = TRUE)
   if (is.null(names(rm))) names(rm) <- rownames(mat)
 
   nm <- names(rm)
-  data.frame(
+  out <- data.frame(
     df = df_val,
     metric = sub("^.*\\.", "", nm),            
     method = sub("\\.(FDR|TPR)$", "", nm),      
     value = as.numeric(rm),
     stringsAsFactors = FALSE
   )
+  out <- subset(out, method %in% keep_methods)
+  out
 }
 
 plot_fdr <- function(df_fdr){
@@ -255,16 +258,19 @@ plot_fdr <- function(df_fdr){
     coord_cartesian(ylim = c(0, 0.1)) +
     labs(x = expression(bold(K-p)), y = "FDR", color = NULL, shape = NULL) +
     scale_x_discrete(drop = FALSE, expand = expansion(mult = c(0.05, 0.05)))+
-    scale_color_discrete(
-      breaks = method_levels,
-      labels = c("Oracle","t-test",expression(bold("Untrended-Inv"*chi^2)),
-                 "Untrended-NPMLE",expression(bold("Reg-Inv"*chi^2)),"Reg-NPMLE","Joint-NPMLE")
+    scale_color_manual(
+      breaks =method_levels,
+      values = c(oracle = "chocolate4",t_test = "#E69F00",untrended_invchi = "mediumpurple4",
+                 untrended_npmle = "lightcoral",reg_invchi = "aquamarine4",reg_npmle = "lightskyblue2",
+                 joint_npmle = "deepskyblue4",manorm2 = "chartreuse3"),
+      labels = c("Oracle","t-test",expression(bold("Untrended-Inv"*chi^2)),"Untrended-NPMLE",
+                 expression(bold("Reg-Inv"*chi^2)),"Reg-NPMLE","Joint-NPMLE","MAnorm2")
     ) +
     scale_shape_manual(
       breaks = method_levels,
-      values = c(16, 17, 15, 3, 18, 7, 8),  # pick any 7 distinct shapes you like
+      values = c(16, 17, 15, 3, 18, 7, 8, 4),  # pick any 7 distinct shapes you like
       labels = c("Oracle","t-test",expression(bold("Untrended-Inv"*chi^2)), "Untrended-NPMLE",
-                 expression(bold("Reg-Inv"*chi^2)),"Reg-NPMLE","Joint-NPMLE")
+                 expression(bold("Reg-Inv"*chi^2)),"Reg-NPMLE","Joint-NPMLE","MAnorm2")
     ) +
     theme_minimal()
   
@@ -295,16 +301,19 @@ plot_tpr <- function(df_tpr){
     coord_cartesian(ylim = c(0, 1)) +
     labs(x = expression(bold(K-p)), y = "Pow", color = NULL, shape = NULL) +
     scale_x_discrete(drop = FALSE, expand = expansion(mult = c(0.05, 0.05)))+
-    scale_color_discrete(
+    scale_color_manual(
       breaks =method_levels,
+      values = c(oracle = "chocolate4",t_test = "#E69F00",untrended_invchi = "mediumpurple4",
+                 untrended_npmle = "lightcoral",reg_invchi = "aquamarine4",reg_npmle = "lightskyblue2",
+                 joint_npmle = "deepskyblue4",manorm2 = "chartreuse3"),
       labels = c("Oracle","t-test",expression(bold("Untrended-Inv"*chi^2)),"Untrended-NPMLE",
-                 expression(bold("Reg-Inv"*chi^2)),"Reg-NPMLE","Joint-NPMLE")
+                 expression(bold("Reg-Inv"*chi^2)),"Reg-NPMLE","Joint-NPMLE","MAnorm2")
     ) +
     scale_shape_manual(
       breaks = method_levels,
-      values = c(16, 17, 15, 3, 18, 7, 8),  # pick any 7 distinct shapes you like
+      values = c(16, 17, 15, 3, 18, 7, 8, 4),  
       labels = c("Oracle","t-test",expression(bold("Untrended-Inv"*chi^2)),"Untrended-NPMLE",
-                 expression(bold("Reg-Inv"*chi^2)), "Reg-NPMLE","Joint-NPMLE")
+                 expression(bold("Reg-Inv"*chi^2)), "Reg-NPMLE","Joint-NPMLE","MAnorm2")
     ) +
     theme_minimal()
   

@@ -7,8 +7,8 @@ library(grid)
 library(scales)
 
 # -----Load Function-----
-source('../../function/func_limma_trend.R')
-source('../../function/func_plot.R')
+source('../function/func_limma_trend.R')
+source('../function/func_plot.R')
 # -----Data Preprocessing-----
 
 ## Download data
@@ -97,29 +97,31 @@ sum(BH_adjust(result$reg_npmle,alpha))
 
 # -----Plot-----
 
-## Marginal S
-marginal_S_data <- make_marginal_S_data(info,prior_result,include_joint = FALSE)
-plot_marginal_S <- make_marginal_S_plot(marginal_S_data,info,xlim_R =0.1,include_joint = FALSE)
-plot_marginal_S <- func_plot_modified(plot_marginal_S)
+## Log Marginal
+logvar_data <- make_logvar_marginal_data(
+  info = info,
+  prior_result = prior_result,
+  length.out = 3000,
+  xlim_log = c(-10, 9)
+)
 
-## Prior sigma
-plot_prior_sigma <- make_prior_sigma_plot(prior_result,scale_factor=200,xlim_R =0.1)
-plot_prior_sigma <- func_plot_modified(plot_prior_sigma)
+plot_marginal_combined <-  plot_logvar_marginal_data(plot_data = logvar_data,bins = 100)
+plot_marginal_combined <- func_plot_modified(plot_marginal_combined ) +ylim(0,0.55)
 
-## Marginal V
-marginal_V_data <- make_marginal_V_data(info,prior_result)
-plot_marginal_V <- make_marginal_V_plot(marginal_V_data,info,xlim_R =7.5)
-plot_marginal_V <- func_plot_modified(plot_marginal_V)
+## Log Prior
+prior_log_data <- make_npmle_prior_log_data(
+  prior_result = prior_result,
+  threshold = 1e-8,
+  length.out = 5000,
+  xlim_log = c(-8, 8)
+)
+plot_prior_combined  <- plot_npmle_prior_log_data(plot_data = prior_log_data)
+plot_prior_combined <- func_plot_modified(plot_prior_combined) 
 
-## Prior tau
-plot_prior_tau <- make_prior_tau_plot(prior_result,scale_factor=1.5,xlim_R =8)
-plot_prior_tau <- func_plot_modified(plot_prior_tau)
 
 
-#ggsave(filename = "./figure/marginal_S.pdf", plot = plot_marginal_S, width = 8, height = 6, dpi = 300)
-#ggsave(filename = "./figure/prior_sigma.pdf", plot = plot_prior_sigma, width = 8, height = 6, dpi = 300)
-#ggsave(filename = "./figure/marginal_V.pdf", plot = plot_marginal_V, width = 8, height = 6, dpi = 300)
-#ggsave(filename = "./figure/prior_tau.pdf", plot = plot_prior_tau, width = 8, height = 6, dpi = 300)
+#ggsave(filename = "./figure/log_marginal_combined.pdf", plot = plot_marginal_combined , width = 8, height = 6, dpi = 300)
+#ggsave(filename = "./figure/log_prior_combined.pdf", plot = plot_prior_combined, width = 8, height = 6, dpi = 300)
 
 
 # -----Mimic-joint-npmle-----
@@ -149,136 +151,340 @@ table(pep_grp)
 
 # Estimating prior
 mimic_joint_npmle_prior <- prior_mimic_joint_npmle(info,pep_grp,v=80,verbose = FALSE)
-prior_result$mimic_joint_npmle<-mimic_joint_npmle_prior
 
 # P value calculation
 P_list_mimic_joint_npmle <- P_value_mimic_joint_npmle(info,mimic_joint_npmle_prior,pep_grp,contrast_name=1)
 result$mimic_joint_npmle <- P_list_mimic_joint_npmle
 sum(BH_adjust(P_list_mimic_joint_npmle,alpha))
 
-#save(info,prior_result,result, file = "data/plot_ready_data_proteomics.RData")
-
 # -----Mimic-joint-npmle plot-----
-
-#load("data/plot_ready_data_proteomics.RData")
-
 ## trend plot
-x_proteome <- expression(bold(M[i])~"(" * "peptide counts)")
-plot_trend_mimic_joint<- make_trend_plot_mimic_joint(info,prior_result,pep_grp,0.6,x_proteome)
+
+plot_trend_mimic_joint <- make_trend_plot_mimic_joint(info,mimic_joint_npmle_prior,pep_grp)
 plot_trend_mimic_joint <- func_plot_modified(plot_trend_mimic_joint)
 
 #ggsave(filename = "./figure/combined_trend.pdf", plot = plot_trend_mimic_joint, width = 20, height = 6, dpi = 300)
 
-## significance plot
-out <- summary_significance_pep_grp(result,pep_grp)
-p_bar <- ggplot(out$df_sum, aes(x = M, y = sig, fill = method)) +
-  geom_col(position = position_dodge(width = 0.65), width = 0.6,alpha = 0.8,color = "black",linewidth = 0.4) +
-  labs(x = expression(bold(M[i])),y = expression(bold("# significant discoveries")),fill = NULL) +
-  scale_fill_manual(
-    values = c("gray40","lightsalmon1","aquamarine3","mediumpurple4","lightcoral","#377EB8"),
-    breaks = c("t","untrend","untrend_1d","trend","trend_1d","trend_2d"),
-    labels = c("t-test",expression(bold("Untrended-Inv"*chi^2)), "Untrended-NPMLE", expression(bold("Reg-Inv"*chi^2)),
-               "Reg-NPMLE$","Joint-NPMLE")
-  ) +
-  theme_minimal(base_size = 14)
-p_bar_final <- func_plot_modified(p_bar)
-
-#ggsave(filename = "./figure/discoveries.pdf", plot = p_bar_final, width = 20, height = 6, dpi = 300)
 
 ## Prop-significance plot
+out <- summary_significance_pep_grp(result,pep_grp)
+method_breaks <- c("t", "untrend", "untrend_1d", "trend", "trend_1d", "trend_2d")
 
-p_prop <- ggplot(out$df_prop, aes(x = M, y = prop, color = method, group = method,shape=method)) +
-  geom_line(size = 1.5) +
-  geom_point(size = 2) +
+method_labels <- c("t-test",expression(bold("Untrended-Inv" * chi^2)),"Untrended-NPMLE",
+                   expression(bold("Reg-Inv" * chi^2)),"Reg-NPMLE","Joint-NPMLE")
+
+method_colors <- c("t" = "gray40","untrend" = "mediumpurple4","untrend_1d" = "lightcoral",
+                   "trend" = "aquamarine4","trend_1d" = "lightskyblue2","trend_2d" = "lightsalmon1")
+
+method_shapes <- c("t" = 17,"untrend" = 15,"untrend_1d" = 3,"trend" = 18,"trend_1d" = 7,"trend_2d" = 8)
+
+p_prop <- ggplot(out$df_prop,aes(x = M, y = prop, color = method, group = method, shape = method)) +
+  geom_line(linewidth = 1.5) +
+  geom_point(size = 2.5) +
   scale_y_continuous(labels = percent_format(accuracy = 1),expand = expansion(mult = c(0, 0.3))) +
-  labs(x = expression(bold(M[i])), y = "Proportion of significance",color = NULL) +
-  scale_color_manual(
-    values = c("gray40","lightsalmon1","aquamarine3","mediumpurple4","lightcoral","#377EB8"),
-    breaks = c("t","untrend","untrend_1d","trend","trend_1d","trend_2d"),
-    labels = c("t-test",expression(bold("Untrended-Inv"*chi^2)),"Untrended-NPMLE", expression(bold("Reg-Inv"*chi^2)),
-               "Reg-NPMLE","Joint-NPMLE") ) +
-  scale_shape_manual(
-    breaks = c("t","untrend","untrend_1d","trend","trend_1d","trend_2d"),
-    values = c( 17, 15, 3, 18, 7, 8),  # pick any 7 distinct shapes you like
-    labels = c("t-test",expression(bold("Untrended-Inv"*chi^2)),"Untrended-NPMLE",expression(bold("Reg-Inv"*chi^2)),    
-               "Reg-NPMLE","Joint-NPMLE"),
-    guide = "none")+
-  guides(color = guide_legend(override.aes = list(shape = unname(c( 17, 15, 3, 18, 7, 8))))) +
+  labs(x = expression(bold(M[i])),y = "Proportion of significance",color = NULL,shape = NULL) +
+  scale_color_manual(values = method_colors,breaks = method_breaks,labels = method_labels,name = NULL) +
+  scale_shape_manual(values = method_shapes,breaks = method_breaks,labels = method_labels,name = NULL) +
   theme_minimal(base_size = 14)
-p_prop_final<- func_plot_modified(p_prop) +
-  guides(color = guide_legend(nrow = 2, byrow = TRUE)) +
-  theme(axis.text.x  = element_text(size = 10,angle = 30, hjust = 1, vjust = 1))
 
+p_prop_final<- func_plot_modified(p_prop)+
+  guides(
+    color = guide_legend(
+      nrow = 2,byrow = TRUE,
+      override.aes = list(shape = unname(method_shapes[method_breaks]),linewidth = 1.5,size = 3),
+      keywidth = unit(1.6, "lines"),keyheight = unit(0.9, "lines")
+    ),
+    shape = "none"
+  ) +
+  theme(
+    legend.position = "inside",
+    legend.position.inside = c(0.06, 0.98),
+    legend.justification = c(0, 1),
+    legend.direction = "horizontal",
+    legend.box = "horizontal",
+    legend.spacing.x = unit(0.25, "cm"),
+    legend.spacing.y = unit(0.02, "cm"),
+    legend.key.width = unit(1.6, "lines"),
+    legend.key.height = unit(0.9, "lines"),
+    axis.text.x = element_text(size = 15, angle = 40, hjust = 1, vjust = 1)
+  )
 #ggsave(filename = "./figure/prop_discoveries.pdf", plot = p_prop_final, width = 8, height = 6, dpi = 300)
 
 ## Mimic-joint-prior plot
-df_spike <- bind_rows(lapply(names(mimic_joint_npmle_prior), function(g) {
-  d <- mimic_joint_npmle_prior[[g]]
-  data.frame(
-    pep_grp = g,
-    value   = d$value,
-    prob    = d$prob
-  )
-}))
-bins <- unique(df_spike$pep_grp)
-
-make_one_bin_plot <- function(g, show_x = FALSE) {
-  d <- df_spike %>% filter(pep_grp == g)
-
-  p <- ggplot(d, aes(x = value)) +
-    geom_segment(aes(xend = value, y = 0, yend = prob),
-                 linewidth = 1, color = "aquamarine3") +
-    coord_cartesian(xlim = c(5e-4, 1e-1),
-                    ylim = c(0, max(df_spike$prob, na.rm = TRUE))) +
-    scale_x_log10() +
-    scale_y_continuous(breaks = NULL) +   # <-- removes 0.0/0.25/... everywhere
-    labs(y = g, x = NULL) +
+make_horizontal_joint_prior_plot <- function(
+  prior_result,
+  ylim_sigma = c(5e-4, 1e-1),
+  max_width = 0.75,
+  grid_width = 0.85,
+  line_size = 1,
+  color = "aquamarine3"
+) {
+  
+  df_spike <- bind_rows(lapply(names(prior_result$mimic_joint_npmle), function(g) {
+    d <- prior_result$mimic_joint_npmle[[g]]
+    data.frame(pep_grp = g,value = d$value,prob = d$prob)
+  }))
+  
+  bins <- unique(df_spike$pep_grp)
+  
+  df_plot <- df_spike %>%
+    mutate(pep_grp = factor(pep_grp, levels = bins),bin_id = as.numeric(pep_grp))
+  
+  max_prob <- max(df_plot$prob, na.rm = TRUE)
+  
+  df_plot <- df_plot %>%
+    mutate(x_start = bin_id - max_width / 2,x_end = x_start + max_width * prob / max_prob)
+  
+  major_breaks <- c(1e-3, 1e-2, 1e-1)
+  minor_breaks <- c(3e-3, 3e-2)
+  
+  grid_major_df <- expand.grid(
+    bin_id = seq_along(bins),
+    y = major_breaks
+  ) %>%
+    mutate(x_start = bin_id - grid_width / 2,x_end = bin_id + grid_width / 2)
+  
+  grid_minor_df <- expand.grid(
+    bin_id = seq_along(bins),
+    y = minor_breaks
+  ) %>%
+    mutate(x_start = bin_id - grid_width / 2,x_end = bin_id + grid_width / 2)
+  
+  p <- ggplot(df_plot) +
+    
+    geom_segment(
+      data = grid_minor_df,
+      aes(x = x_start,xend = x_end,y = y,yend = y),
+      inherit.aes = FALSE,color = "grey93",linewidth = 0.35
+    ) +
+    
+    geom_segment(
+      data = grid_major_df,
+      aes(x = x_start,xend = x_end,y = y,yend = y),
+      inherit.aes = FALSE,
+      color = "grey88",
+      linewidth = 0.55
+    ) +
+    
+    geom_segment(
+      aes(x = x_start,xend = x_end,y = value,yend = value),
+      linewidth = line_size,
+      color = color,
+      lineend = "butt"
+    ) +
+    
+    scale_x_continuous(breaks = seq_along(bins),labels = bins,expand = expansion(mult = c(0.02, 0.02))) +
+    scale_y_log10(breaks = major_breaks,minor_breaks = NULL,labels = c("0.001", "0.010", "0.100")) +
+    coord_cartesian(ylim = ylim_sigma) +
+    labs(x = expression(bold(M[i])),y = expression(bold(sigma^2))
+    ) +
+    
     theme_minimal(base_size = 12) +
+    
     theme(
-      plot.margin = margin(4, 10, 4, 10),
-      axis.title.y = element_text(size = 9, face = "plain", angle = 0, vjust = 0.5),
-
-      axis.text.y  = element_blank(),
-      axis.ticks.y = element_blank(),
-
+      axis.title.x = element_text(face = "bold", size = 12),
+      axis.title.y = element_text(face = "bold", size = 16),
+      axis.text.x  = element_text(size = 10, angle = 45, hjust = 1, vjust = 1),
+      axis.text.y  = element_text(size = 12),
+      
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank(),
       panel.grid.major.y = element_blank(),
-      panel.grid.minor.y = element_blank()
+      panel.grid.minor.y = element_blank(),
+      
+      axis.ticks.x = element_blank(),
+      
+      panel.border = element_rect(color = "black", fill = NA, linewidth = 0.6),
+      plot.margin = margin(8, 8, 8, 8)
     )
-
-  if (!show_x) {
-    p <- p + theme(axis.text.x = element_blank(),
-                   axis.ticks.x = element_blank())
-  } else {
-    p <- p + labs(x = expression(bold(sigma^2))) +
-      theme(axis.title.x = element_text(face = "bold", size = 16),
-            axis.text.x  = element_text(size = 12))
-  }
-
+  
   p
 }
+p_horizontal <- make_horizontal_joint_prior_plot(
+  prior_result = prior_result,
+  ylim_sigma = c(5e-4, 1e-1),
+  max_width = 0.75,
+  grid_width = 0.85,
+  line_size = 0.7,
+  color = "aquamarine3"
+)
+#ggsave(filename = "./figure/mimic-joint-prior-flip.pdf", plot = p_horizontal, width = 8, height = 6, dpi = 300)
 
-plist <- lapply(seq_along(bins), \(j) make_one_bin_plot(bins[j], show_x = (j == length(bins))))
-p_stack <- wrap_plots(plist, ncol = 1) + plot_layout(heights = rep(1, length(plist)))
-ylab_col <- wrap_elements(full = textGrob(expression(M[i]), rot = 90,
-                                         gp = gpar(fontface = "bold", fontsize = 14)))
-p_with_ylab <- ylab_col + p_stack + plot_layout(widths = c(0.08, 1))
-
-add_panel_border <- function(p, col = "black", lwd = 2) {
-  g <- patchworkGrob(p)
-
-  panels <- grepl("^panel", g$layout$name)
-  t <- min(g$layout$t[panels]); b <- max(g$layout$b[panels])
-  l <- min(g$layout$l[panels]); r <- max(g$layout$r[panels])
-
-  g <- gtable_add_grob(
-    g,
-    rectGrob(gp = gpar(fill = NA, col = col, lwd = lwd)),
-    t = t, b = b, l = l, r = r, z = Inf
+## Log marginal with different values of M
+marginal_S2_reg_npmle_given_A <- function(x, A, df, value, probability, mhat_fun) {
+  xi2 <- exp(mhat_fun(A))
+  (1 / xi2) * marginal_S_g2_npmle(
+    x / xi2,
+    df = df,
+    value = value,
+    probability = probability
   )
-  g
 }
 
-g_stack_bordered <- add_panel_border(p_stack, lwd = 2)
-p_stack_bordered  <- wrap_elements(full = g_stack_bordered)
-mimic_prior_final <- ylab_col + p_stack_bordered + plot_layout(widths = c(0.01, 1))
-#ggsave(filename = "./figure/mimic-joint-prior.pdf", plot = mimic_prior_final, width = 4.5, height = 11, dpi = 300)
+make_marginal_S2_data_by_A <- function(info_sub, prior_result, group_id, mhat_fun,
+                                  length.out = 3000) {
+  x_vals <- exp(seq(log(min(info_sub$var)), log(max(info_sub$var)), length.out = length.out))
+  prior_group <- prior_result$mimic_joint_npmle[[group_id]]
+
+  y_vals_joint_npmle_discrete <- sapply(x_vals, marginal_S_g2_npmle , df = info_sub$df, 
+                                        value = prior_group$value, probability = prior_group$prob)
+
+  y_vals_reg_npmle <- sapply(
+    x_vals,
+    marginal_S2_reg_npmle_given_A,
+    A = info_sub$A[1],
+    df = info_sub$df,
+    value = prior_result$reg_npmle$grid,
+    probability = prior_result$reg_npmle$mass,
+    mhat_fun = mhat_fun
+  )
+
+  tibble::tibble(
+    x = x_vals,
+    y_joint_npmle_discrete = y_vals_joint_npmle_discrete,
+    y_reg_npmle = y_vals_reg_npmle
+  )
+}
+
+make_marginal_S_by_A_plot<- function(marginal_S_data_by_A,info,xlim_R = 1,line_size=1.5){
+  p <- ggplot() +
+    geom_histogram(
+      data = data.frame(S = info$var),
+      aes(x = S, y = after_stat(density), fill = "Histogram"),
+      color = "grey50", bins = 50, alpha = 0.3
+    ) +
+    geom_line(data = marginal_S_data_by_A, aes(x = x, y = y_reg_npmle, color = "Reg-NPMLE"), size = line_size, lineend = "round") +
+    geom_line(data = marginal_S_data_by_A, aes(x = x, y = y_joint_npmle_discrete, color = "Joint-NPMLE"), size = line_size, lineend = "round") +
+    xlim(0, xlim_R) +
+    labs(x = expression(bold(S[i]^2)), y = "Density") +
+    scale_fill_manual(values = c("Histogram" = "grey"), name = NULL) +
+    theme_minimal()
+
+
+  # Build color scale conditionally so legend matches what is plotted
+  color_values <- c( "Reg-NPMLE" = "lightskyblue2",
+                    "Joint-NPMLE" = "deepskyblue4")
+  color_breaks <- c("Reg-NPMLE", "Joint-NPMLE")
+  color_labels <- c("Reg-NPMLE","Joint-NPMLE")
+
+  p <- p +
+    scale_color_manual(
+      values = color_values,
+      breaks = color_breaks,
+      labels = color_labels,
+      name = NULL
+    ) +
+    guides(
+      fill  = guide_legend(order = 1),
+      color = guide_legend(order = 2)
+    )
+
+  p
+
+}
+
+idx <- which(pep_grp == "1")
+info_sub <- list(
+  var = info$var[idx],
+  A   = info$A[idx],
+  df  = info$df
+)
+marginal_S2_data_by_A <- make_marginal_S2_data_by_A(
+  info_sub = info_sub,
+  prior_result = prior_result,
+  group_id = "1",
+  mhat_fun = fit_trend_var_A(info$var,info$A)$pred_e
+)
+plot_marginal_S_by_A_1 <- make_marginal_S_by_A_plot(marginal_S2_data_by_A,info_sub,xlim_R =0.2)
+plot_marginal_S_by_A_1 <- func_plot_modified(plot_marginal_S_by_A_1) + 
+  labs(title = expression(M[i]==1)) + theme(axis.title.x = element_blank()) 
+
+idx <- which(pep_grp == "2")
+info_sub <- list(
+  var = info$var[idx],
+  A   = info$A[idx],
+  df  = info$df
+)
+marginal_S2_data_by_A <- make_marginal_S2_data_by_A(
+  info_sub = info_sub,
+  prior_result = prior_result,
+  group_id = "2",
+  mhat_fun = fit_trend_var_A(info$var,info$A)$pred_e
+)
+plot_marginal_S_by_A_2 <- make_marginal_S_by_A_plot(marginal_S2_data_by_A,info_sub,xlim_R =0.15)
+plot_marginal_S_by_A_2 <- func_plot_modified(plot_marginal_S_by_A_2) + 
+  labs(title = expression(M[i]==2)) + theme(legend.position = "none",
+                                            axis.title.y = element_blank(),
+                                            axis.title.x = element_blank()) 
+
+idx <- which(pep_grp == "3")
+info_sub <- list(
+  var = info$var[idx],
+  A   = info$A[idx],
+  df  = info$df
+)
+marginal_S2_data_by_A <- make_marginal_S2_data_by_A(
+  info_sub = info_sub,
+  prior_result = prior_result,
+  group_id = "3",
+  mhat_fun = fit_trend_var_A(info$var,info$A)$pred_e
+)
+plot_marginal_S_by_A_3 <- make_marginal_S_by_A_plot(marginal_S2_data_by_A,info_sub,xlim_R =0.1)
+plot_marginal_S_by_A_3 <- func_plot_modified(plot_marginal_S_by_A_3) + 
+  labs(title = expression(M[i]==3)) + theme(legend.position = "none",
+                                            axis.title.y = element_blank(),
+                                            axis.title.x = element_blank()) 
+
+idx <- which(pep_grp == "4")
+info_sub <- list(
+  var = info$var[idx],
+  A   = info$A[idx],
+  df  = info$df
+)
+marginal_S2_data_by_A <- make_marginal_S2_data_by_A(
+  info_sub = info_sub,
+  prior_result = prior_result,
+  group_id = "4",
+  mhat_fun = fit_trend_var_A(info$var,info$A)$pred_e
+)
+plot_marginal_S_by_A_4 <- make_marginal_S_by_A_plot(marginal_S2_data_by_A,info_sub,xlim_R =0.1)
+plot_marginal_S_by_A_4 <- func_plot_modified(plot_marginal_S_by_A_4)+ 
+  labs(title = expression(M[i]==4)) + theme(legend.position = "none")
+
+idx <- which(pep_grp == "5")
+info_sub <- list(
+  var = info$var[idx],
+  A   = info$A[idx],
+  df  = info$df
+)
+marginal_S2_data_by_A <- make_marginal_S2_data_by_A(
+  info_sub = info_sub,
+  prior_result = prior_result,
+  group_id = "5",
+  mhat_fun = fit_trend_var_A(info$var,info$A)$pred_e
+)
+plot_marginal_S_by_A_5 <- make_marginal_S_by_A_plot(marginal_S2_data_by_A,info_sub,xlim_R =0.1)
+plot_marginal_S_by_A_5 <- func_plot_modified(plot_marginal_S_by_A_5)+ 
+  labs(title = expression(M[i]==5)) + theme(legend.position = "none") + theme(axis.title.y = element_blank())
+
+
+idx <- which(pep_grp == "6")
+info_sub <- list(
+  var = info$var[idx],
+  A   = info$A[idx],
+  df  = info$df
+)
+marginal_S2_data_by_A <- make_marginal_S2_data_by_A(
+  info_sub = info_sub,
+  prior_result = prior_result,
+  group_id = "6",
+  mhat_fun = fit_trend_var_A(info$var,info$A)$pred_e
+)
+plot_marginal_S_by_A_6 <- make_marginal_S_by_A_plot(marginal_S2_data_by_A,info_sub,xlim_R =0.1)
+plot_marginal_S_by_A_6 <- func_plot_modified(plot_marginal_S_by_A_6) + 
+  labs(title = expression(M[i]==6)) + theme(legend.position = "none") + theme(axis.title.y = element_blank())
+
+
+panel_plot <- (plot_marginal_S_by_A_1 | plot_marginal_S_by_A_2 | plot_marginal_S_by_A_3) /
+              (plot_marginal_S_by_A_4 | plot_marginal_S_by_A_5 | plot_marginal_S_by_A_6)
+#ggsave("./figure/marginal_logS2_panel.pdf", panel_plot, width = 16, height = 8)

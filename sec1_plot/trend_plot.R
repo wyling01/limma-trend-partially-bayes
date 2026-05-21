@@ -80,8 +80,8 @@ save_panel <- function(p, stem, w = 3.15, h = 2.75) {
 out_dir <- "camera_ready_plots"
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
-x_rnaseq   <- expression(bold(A[i])~"(avg. intensity)")
-x_chipseq  <- expression(bold(A[i])~"(avg. intensity)")
+x_rnaseq   <- expression(bold(M[i])~"(avg. intensity)")
+x_chipseq  <- expression(bold(M[i])~"(avg. intensity)")
 x_proteome <- expression(bold(M[i])~"(" * log[2] * " peptide counts)")
 
 q <- quantile(rnaseq1_trend_data$M,0.999)

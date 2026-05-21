@@ -11,8 +11,8 @@ library(data.table)
 library(pheatmap)
 
 # -----Load Function-----
-source('../../function/func_limma_trend.R')
-source('../../function/func_plot.R')
+source('../function/func_limma_trend.R')
+source('../function/func_plot.R')
 # -----Data Preprocessing-----
 
 ## ---Load gene ID mappings
@@ -214,35 +214,32 @@ sum(BH_adjust(result$reg_invchi,alpha)) # 6
 sum(BH_adjust(result$reg_npmle,alpha)) # 6
 sum(BH_adjust(result$joint_npmle,alpha)) # 10
 
-#save(info,prior_result, file = "data/plot_ready_data_rnaseq2.RData")
-
 # Plot
-
-#load("data/plot_ready_data_rnaseq2.RData")
 
 ## Trend plot
 trend_data <- make_trend_data(info,prior_result)
-x_rnaseq <- expression(bold(A[i])~"(avg. intensity)")
-plot_trend<- make_trend_plot(trend_data,0.7,x_rnaseq)
+plot_trend <- make_trend_plot(trend_data)
 plot_trend <- func_plot_modified(plot_trend)
 
-## Marginal S
-marginal_S_data <- make_marginal_S_data(info,prior_result)
-plot_marginal_S <- make_marginal_S_plot(marginal_S_data,info,xlim_R =5)
-plot_marginal_S <- func_plot_modified(plot_marginal_S)
+## Log Marginal 
+logvar_data <- make_logvar_marginal_data(
+  info = info,
+  prior_result = prior_result,
+  length.out = 3000,
+  xlim_log = c(-3, 4)
+)
+plot_marginal_combined <-  plot_logvar_marginal_data(plot_data = logvar_data,bins = 100)
+plot_marginal_combined <- func_plot_modified(plot_marginal_combined ) +ylim(0,0.75)
 
-## Prior sigma
-plot_prior_sigma <- make_prior_sigma_plot(prior_result,scale_factor=5,xlim_R =6)
-plot_prior_sigma <- func_plot_modified(plot_prior_sigma)
-
-## Marginal V
-marginal_V_data <- make_marginal_V_data(info,prior_result)
-plot_marginal_V <- make_marginal_V_plot(marginal_V_data,info,xlim_R =6)
-plot_marginal_V <- func_plot_modified(plot_marginal_V)
-
-## Prior tau
-plot_prior_tau <- make_prior_tau_plot(prior_result,scale_factor=3,xlim_R =6)
-plot_prior_tau <- func_plot_modified(plot_prior_tau)
+## Log Prior
+prior_log_data <- make_npmle_prior_log_data(
+  prior_result = prior_result,
+  threshold = 1e-8,
+  length.out = 5000,
+  xlim_log = c(-3, 4)
+)
+plot_prior_combined  <- plot_npmle_prior_log_data(plot_data = prior_log_data)
+plot_prior_combined <- func_plot_modified(plot_prior_combined)
 
 ## Joint prior
 plot_joint_prior <- make_joint_prior_plot(prior_result)
@@ -250,9 +247,7 @@ plot_joint_prior <- func_plot_modified(plot_joint_prior)+theme(legend.position =
 
 
 
-#ggsave(filename = "./figure/marginal_S.pdf", plot = plot_marginal_S, width = 8, height = 6, dpi = 300)
-#ggsave(filename = "./figure/prior_sigma.pdf", plot = plot_prior_sigma, width = 8, height = 6, dpi = 300)
-#ggsave(filename = "./figure/marginal_V.pdf", plot = plot_marginal_V, width = 8, height = 6, dpi = 300)
-#ggsave(filename = "./figure/prior_tau.pdf", plot = plot_prior_tau, width = 8, height = 6, dpi = 300)
+#ggsave(filename = "./figure/log_marginal_combined.pdf", plot = plot_marginal_combined , width = 8, height = 6, dpi = 300)
+#ggsave(filename = "./figure/log_prior_combined.pdf", plot = plot_prior_combined, width = 8, height = 6, dpi = 300)
 #ggsave(filename = "./figure/prior_2d.pdf", plot = plot_joint_prior, width = 8, height = 6, dpi = 300)
 #ggsave(filename = "./figure/combined_trend.png", plot = plot_trend, width = 8, height = 6, dpi = 300)
