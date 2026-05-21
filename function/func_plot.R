@@ -10,6 +10,7 @@ library(RColorBrewer)
 library(tibble)
 library(tidyr)
 library(dplyr)
+library(grid)
 library(scales)
 
 
@@ -71,9 +72,10 @@ posterior_log_sigma2 <- function(a, k, prior_tbl) {
   sum(w * log(prior_tbl$sigma2))
 }
 
-posterior_logS2 <- function(a,k, d, prior_tbl) {
-  posterior_log_sigma2(a, k,prior_tbl) + digamma(d/2) + log(2/d)
+posterior_logS2 <- function(a, k, d, prior_tbl) {
+  posterior_log_sigma2(a, k, prior_tbl) + digamma(d / 2) + log(2 / d)
 }
+
 
 make_trend_data <- function(info,prior_result){
   idx <- prior_result$joint_npmle$idx
@@ -114,7 +116,7 @@ make_trend_plot <- function(trend_data,alpha,xlab){
     ylim(min(trend_data$log_sample_var),max(trend_data$log_sample_var)+1)+
     labs(
       x = xlab,
-      y = expression(bold(log(S[i]^2))),
+      y = expression(bold(log(S^2))),
       color = NULL
     ) +
     scale_color_manual(
@@ -127,7 +129,7 @@ make_trend_plot <- function(trend_data,alpha,xlab){
   plot_trend
 }
 
-# Marginal S
+# Log Marginal
 dSg2_marginal <- function(x, d, d0, s0_2, log = FALSE) {
   if (log) {
     # log(f(x/s02)) - log(s02)
@@ -150,176 +152,253 @@ marginal_S_g2_npmle <- function(x, df, value, probability) {
   return(result)
 }
 
-make_marginal_S_data <- function(info,prior_result,include_joint = TRUE,length.out=3000){
-  x_vals <- exp(seq(log(min(info$var)), log(max(info$var)), length.out = length.out))
-  y_vals_untrended_invchi <- sapply(x_vals, dSg2_marginal, d = info$df, d0 = prior_result$untrended_invchi$d0, s0_2 = prior_result$untrended_invchi$s02)
-  y_vals_untrended_npmle <- sapply(x_vals, marginal_S_g2_npmle , df = info$df, value = prior_result$untrended_npmle$grid, probability = prior_result$untrended_npmle$mass)
+make_logvar_marginal_data <- function(info,prior_result,length.out = 3000,
+                                      xlim_log = c(-10, 10)) {
   
-  marginal_S_data <- tibble::tibble(
-    x = x_vals,
-    y_untrended_npmle = y_vals_untrended_npmle,
-    y_untrended_invchi = y_vals_untrended_invchi
+  eps <- 1e-12
+  method_levels <- c("Untrended-Inv","Untrended-NPMLE","Reg-Inv","Reg-NPMLE")
+  
+  hist_df <- tibble(logS2 = log(pmax(info$var, eps)),logV2 = log(pmax(info$V, eps)))
+  
+  hist_df_long <- hist_df %>%
+    pivot_longer(
+      cols = c(logS2, logV2),
+      names_to = "type",
+      values_to = "value"
+    ) %>%
+    mutate(
+      type = factor(type, levels = c("logS2", "logV2"))
+    )
+  
+  t_vals <- seq(xlim_log[1], xlim_log[2], length.out = length.out)
+  x_vals <- exp(t_vals)
+  
+  y_untrended_invchi <- sapply(
+    x_vals,
+    dSg2_marginal,
+    d = info$df,
+    d0 = prior_result$untrended_invchi$d0,
+    s0_2 = prior_result$untrended_invchi$s02
   )
-
-  if (include_joint) {
-    idx <- prior_result$joint_npmle$idx
-    y_vals_joint_npmle <- sapply(
-      x_vals, marginal_S_g2_npmle,
-      df = info$df,
-      value = prior_result$joint_npmle$grid[idx, 2],
-      probability = prior_result$joint_npmle$mass[idx]
-    )
-    marginal_S_data$y_joint_npmle <- y_vals_joint_npmle
-  }
-
-  return(marginal_S_data)
+  
+  y_untrended_npmle <- sapply(
+    x_vals,
+    marginal_S_g2_npmle,
+    df = info$df,
+    value = prior_result$untrended_npmle$grid,
+    probability = prior_result$untrended_npmle$mass
+  )
+  
+  y_reg_invchi <- sapply(
+    x_vals,
+    dSg2_marginal,
+    d = info$df,
+    d0 = prior_result$reg_invchi$d0,
+    s0_2 = prior_result$reg_invchi$v02
+  )
+  
+  y_reg_npmle <- sapply(
+    x_vals,
+    marginal_S_g2_npmle,
+    df = info$df,
+    value = prior_result$reg_npmle$grid,
+    probability = prior_result$reg_npmle$mass
+  )
+  
+  line_df <- bind_rows(
+    tibble(x = t_vals,y = x_vals * y_untrended_invchi,method = "Untrended-Inv"),
+    tibble(x = t_vals,y = x_vals * y_untrended_npmle,method = "Untrended-NPMLE"),
+    tibble(x = t_vals,y = x_vals * y_reg_invchi,method = "Reg-Inv"),
+    tibble(x = t_vals,y = x_vals * y_reg_npmle,method = "Reg-NPMLE")
+  ) %>%
+    filter(is.finite(x), is.finite(y), y >= 0) %>%
+    mutate(method = factor(method, levels = method_levels))
+  
+  list(
+    hist_df_long = hist_df_long,
+    line_df = line_df,
+    xlim_log = xlim_log,
+    method_levels = method_levels
+  )
 }
 
-make_marginal_S_plot<- function(marginal_S_data,info,xlim_R = 1,line_size=1.5,include_joint = TRUE){
+plot_logvar_marginal_data <- function(plot_data,bins = 60,line_size = 1.5){
+  
+  hist_df_long <- plot_data$hist_df_long
+  line_df <- plot_data$line_df
+  xlim_log <- plot_data$xlim_log
+  method_levels <- plot_data$method_levels
+  
+  color_values <- c("Untrended-Inv" = "mediumpurple4","Untrended-NPMLE" = "lightcoral",
+                    "Reg-Inv" = "aquamarine4","Reg-NPMLE" = "lightskyblue2")
+  
+  linetype_values <- c("Untrended-Inv" = "dashed","Untrended-NPMLE" = "solid",
+                       "Reg-Inv" = "dashed","Reg-NPMLE" = "solid")
+  
+  legend_labels <- c(expression(bold("Untrended-Inv" * chi^2)),"Untrended-NPMLE",
+                     expression(bold("Reg-Inv" * chi^2)),"Reg-NPMLE")
+  
   p <- ggplot() +
-    geom_histogram(
-      data = data.frame(S = info$var),
-      aes(x = S, y = after_stat(density), fill = "Histogram"),
-      color = "grey50", bins = 100, alpha = 0.3
-    ) +
-    geom_line(data = marginal_S_data, aes(x = x, y = y_untrended_npmle, color = "Untrended-NPMLE"), size = line_size,lineend = "round") +
-    geom_line(data = marginal_S_data, aes(x = x, y = y_untrended_invchi, color = "Untrended-Inv"), size = line_size,lineend = "round") +
-    xlim(0, xlim_R) +
-    labs(x = expression(bold(S[i]^2)), y = "Density") +
-    scale_fill_manual(values = c("Histogram" = "grey"), name = NULL) +
-    theme_minimal()
-
-  # Optionally add joint curve
-  if (include_joint) {
-    p <- p + geom_line(data = marginal_S_data, aes(x = x, y = y_joint_npmle, color = "Joint-NPMLE"), size = line_size,lineend = "round")
-  }
-
-  # Build color scale conditionally so legend matches what is plotted
-  color_values <- c("Untrended-Inv" = "lightsalmon1",
-                    "Untrended-NPMLE" = "aquamarine3")
-  color_breaks <- c("Untrended-Inv", "Untrended-NPMLE")
-  color_labels <- c(expression(bold("Untrended-Inv"*chi^2)),
-                    "Untrended-NPMLE")
-
-  if (include_joint) {
-    color_values <- c(color_values, "Joint-NPMLE" = "#377EB8")
-    color_breaks <- c(color_breaks, "Joint-NPMLE")
-    color_labels <- c(color_labels, "Joint-NPMLE")
-  }
-  p <- p +
-    scale_color_manual(
-      values = color_values,
-      breaks = color_breaks,
-      labels = color_labels,
-      name = NULL
-    ) +
+    geom_histogram(data = hist_df_long,aes(x = value,y = after_stat(density),fill = type),
+                   bins = bins,alpha = 0.35,position = "identity",color = "grey50",linewidth = 0.25) +
+    
+    geom_line(data = line_df %>%
+                filter(method %in% c("Untrended-NPMLE", "Reg-NPMLE")),
+              aes(x = x,y = y,color = method,linetype = method),
+              linewidth = line_size,lineend = "round") +
+    
+    geom_line(data = line_df %>%
+                filter(method %in% c("Untrended-Inv", "Reg-Inv")),
+              aes(x = x,y = y,color = method,linetype = method),
+              linewidth = line_size,lineend = "round") +
+    
+    scale_fill_manual(values = c(logS2 = "#D55E00",logV2 = "grey50"),
+                      breaks = c("logS2", "logV2"),
+                      labels = c(expression(bold(log(S[i]^2))),
+                                 expression(bold(log(V[i]^2)))),
+                      name = NULL) +
+    
+    scale_color_manual(values = color_values,breaks = method_levels,
+                       labels = legend_labels,name = NULL) +
+    scale_linetype_manual(values = linetype_values,breaks = method_levels,
+                          labels = legend_labels,name = NULL) +
+    coord_cartesian(xlim = xlim_log) +
+    
+    labs(x = expression(bold(log(S[i]^2)~"or"~log(V[i]^2))),y = "Density") +
+    
     guides(
-      fill  = guide_legend(order = 1),
-      color = guide_legend(order = 2)
+      fill = guide_legend(order = 1,ncol = 2,
+                          override.aes = list(alpha = 0.35,color = "grey50",linewidth = 0.3),
+                          keywidth = unit(1.8, "lines"),keyheight = unit(0.2, "lines")),
+      color = guide_legend(order = 2,
+                           override.aes = list(linewidth = line_size,linetype = c("dashed", "solid", "dashed", "solid")),
+                           keywidth = unit(3, "lines"),keyheight = unit(0.8, "lines")),
+      linetype = "none"
     )
-
-  p
-
+  
+  return(p)
 }
 
-# Prior sigma
+# Log Prior
 d_scaled_invchisq <- function(t, d0, s02) {
   cst <- ( (d0*s02/2)^(d0/2) ) / gamma(d0/2)
   cst * t^(-(d0/2 + 1)) * exp(-(d0*s02)/(2*t))
 }
 
-make_prior_sigma_plot <- function(prior_result,scale_factor,length.out = 5000,xlim_R =1,line_size=1.5){
-  df_npmle <- data.frame(value = prior_result$untrended_npmle$grid, probability = prior_result$untrended_npmle$mass*scale_factor)
-  xgrid <- seq(min(prior_result$untrended_npmle$grid[prior_result$untrended_npmle$grid > 0]),
-               max(prior_result$untrended_npmle$grid),
-               length.out = length.out)
-  df_invchi <- data.frame(
-    value = xgrid,
-    prob_curve = d_scaled_invchisq(xgrid, d0 =prior_result$untrended_invchi$d0, s02 = prior_result$untrended_invchi$s02)
+make_npmle_prior_log_data <- function(prior_result,threshold = 1e-8,length.out = 5000,
+                                      xlim_log = c(-5, 4),npmle_scale_factor = NULL) {
+  
+  eps <- 1e-12
+  method_levels <- c("Untrended-Inv","Untrended-NPMLE","Reg-Inv","Reg-NPMLE")
+  
+  untrended_npmle_df <- tibble(
+    x = log(pmax(prior_result$untrended_npmle$grid, eps)),
+    mass = prior_result$untrended_npmle$mass,
+    method = "Untrended-NPMLE"
   )
   
-  p <-  ggplot(df_npmle, aes(x = value, y = probability)) +
-    geom_segment(aes(xend = value, yend = 0, color = "Untrended-NPMLE"),size = line_size) +
-    geom_line(data = df_invchi,aes(x = value, y = prob_curve, color = "Untrended-Inv"),size = line_size,lineend = "round") +
-    labs(
-      x = expression(bold(sigma^2)),
-      y = expression(bold(g(sigma^2))),
-      #title = "Estimated prior with NPMLE_trend_1d",
-      color = NULL
-    ) +
-    scale_color_manual(
-      values = c("Untrended-Inv" = "lightsalmon1","Untrended-NPMLE" = "aquamarine3"),
-      breaks = c( "Untrended-Inv","Untrended-NPMLE"),
-      labels = c(expression(bold("Untrended-Inv"*chi^2)),"Untrended-NPMLE")
-    ) +
-    xlim(0,xlim_R)+
-    theme_minimal()
-  p
-}
-
-# Marginal V
-make_marginal_V_data <- function(info,prior_result,length.out=3000){
-  x_vals <- exp(seq(log(min(info$V)), log(max(info$V)), length.out = length.out))
-  y_vals_reg_invchi <- sapply(x_vals, dSg2_marginal, d = info$df, d0 = prior_result$reg_invchi$d0, s0_2 = prior_result$reg_invchi$v02)
-  y_vals_reg_npmle <- sapply(x_vals, marginal_S_g2_npmle , df = info$df, value = prior_result$reg_npmle$grid, probability = prior_result$reg_npmle$mass)
-  
-  marginal_V_data <- tibble(
-    x = x_vals,
-    y_reg_npmle = y_vals_reg_npmle,
-    y_reg_invchi = y_vals_reg_invchi
+  reg_npmle_df <- tibble(
+    x = log(pmax(prior_result$reg_npmle$grid, eps)),
+    mass = prior_result$reg_npmle$mass,
+    method = "Reg-NPMLE"
   )
-  return(marginal_V_data)
+  
+  npmle_df <- bind_rows(untrended_npmle_df, reg_npmle_df) %>%
+    filter(mass > threshold,is.finite(x),x >= xlim_log[1],x <= xlim_log[2])
+  
+  t_vals <- seq(xlim_log[1], xlim_log[2], length.out = length.out)
+  u_vals <- exp(t_vals)
+  
+  untrended_inv_density <- d_scaled_invchisq(u_vals,d0 = prior_result$untrended_invchi$d0,
+                                             s02 = prior_result$untrended_invchi$s02)
+  
+  reg_inv_density <- d_scaled_invchisq(u_vals,d0 = prior_result$reg_invchi$d0,
+                                       s02 = prior_result$reg_invchi$v02)
+  
+  inv_df <- bind_rows(
+    tibble(x = t_vals,y = untrended_inv_density * u_vals,method = "Untrended-Inv"),
+    tibble(x = t_vals,y = reg_inv_density * u_vals,method = "Reg-Inv")
+  ) %>%
+    filter(is.finite(x), is.finite(y), y >= 0)
+  
+  if (is.null(npmle_scale_factor)) {
+    npmle_scale_factor <- max(inv_df$y, na.rm = TRUE) / 
+      max(npmle_df$mass, na.rm = TRUE)
+  }
+  
+  npmle_df <- npmle_df %>%
+    mutate(y = mass * npmle_scale_factor,method = factor(method, levels = method_levels))
+  
+  inv_df <- inv_df %>%
+    mutate(method = factor(method, levels = method_levels))
+  
+  list(
+    npmle_df = npmle_df,
+    inv_df = inv_df,
+    npmle_scale_factor = npmle_scale_factor,
+    xlim_log = xlim_log,
+    method_levels = method_levels
+  )
 }
 
-make_marginal_V_plot<- function(marginal_V_data,info,xlim_R = 1,line_size=1.5){
+plot_npmle_prior_log_data <- function(plot_data,line_size = 1.5) {
+  
+  npmle_df <- plot_data$npmle_df
+  inv_df <- plot_data$inv_df
+  xlim_log <- plot_data$xlim_log
+  method_levels <- plot_data$method_levels
+  
+  legend_labels <- c(expression(bold("Untrended-Inv" * chi^2)),"Untrended-NPMLE",
+                     expression(bold("Reg-Inv" * chi^2)),"Reg-NPMLE"
+  )
+  
+  color_values <- c("Untrended-Inv" = "mediumpurple4","Untrended-NPMLE" = "lightcoral", 
+                    "Reg-Inv" = "aquamarine4","Reg-NPMLE" = "lightskyblue2")
+  
+  linetype_values <- c("Untrended-Inv" = "dashed","Untrended-NPMLE" = "solid",
+                       "Reg-Inv" = "dashed","Reg-NPMLE" = "solid")
+  
+  # Dummy data only for legend alignment
+  legend_x0 <- xlim_log[1] - diff(xlim_log) * 2
+  
+  legend_df <- tibble(
+    x = rep(c(legend_x0, legend_x0 + 0.01), length(method_levels)),
+    y = rep(0, 2 * length(method_levels)),
+    method = factor(rep(method_levels, each = 2),levels = method_levels)
+  )
+  
   p <- ggplot() +
-    geom_histogram(data = data.frame(V= info$V), 
-                   aes(x = V, y = after_stat(density), fill = "Histogram"),color = "grey50",
-                   bins = 100, alpha = 0.3) +
-    geom_line(data = marginal_V_data, aes(x = x, y = y_reg_npmle , color = "Reg-NPMLE"), size = line_size, lineend = "round") +
-    geom_line(data = marginal_V_data, aes(x = x, y = y_reg_invchi , color = "Reg-Inv"), size = line_size, lineend = "round") +
-    xlim(0, xlim_R) +
-    labs( x = expression(bold(hat(V)[i]^2)), y = "Density") +
-    scale_fill_manual(values = c("Histogram" = "grey"), name = NULL) +  # Legend for histogram
-    scale_color_manual(
-      values = c( "Reg-Inv" = "mediumpurple4","Reg-NPMLE" = "lightcoral"),
-      breaks = c( "Reg-Inv","Reg-NPMLE"),
-      labels = c( expression(bold("Reg-Inv"*chi^2)),"Reg-NPMLE"),
-      name = NULL
+    geom_segment(data = npmle_df,aes(x = x,xend = x,y = 0,yend = y,color = method,linetype = method),
+                 linewidth = line_size,lineend = "butt",show.legend = FALSE) +
+    geom_line(data = inv_df,aes(x = x,y = y,color = method,linetype = method),
+              linewidth = line_size,lineend = "round",show.legend = FALSE) +
+    geom_line(data = legend_df,aes(x = x,y = y,color = method,linetype = method),
+              linewidth = line_size,lineend = "round",show.legend = TRUE) +
+    
+    scale_color_manual(values = color_values,breaks = method_levels,
+                       labels = legend_labels,name = NULL) +
+    
+    scale_linetype_manual(values = linetype_values,breaks = method_levels,
+                          labels = legend_labels,name = NULL) +
+    
+    coord_cartesian(xlim = xlim_log) +
+    
+    labs(x = expression(bold(log(sigma^2)~"or"~log(tau^2))),
+         y = "Prior")+
+    
+    guides(
+      color = guide_legend(order = 1,override.aes = list(linewidth = line_size,
+                                                         linetype = c("dashed", "solid", "dashed", "solid")),
+                           keywidth = unit(3, "lines"),keyheight = unit(0.8, "lines")
+      ),
+      linetype = "none"
     ) +
-    theme_minimal() 
-  p
+    
+    theme_minimal()
+  
+  return(p)
 }
 
-# Prior tau
-make_prior_tau_plot <- function(prior_result,scale_factor,length.out = 5000,xlim_R =1,line_size=1.5){
-  df_npmle <- data.frame(value = prior_result$reg_npmle$grid, probability = prior_result$reg_npmle$mass*scale_factor)
-  xgrid <- seq(min(prior_result$reg_npmle$grid[prior_result$reg_npmle$grid > 0]),
-               max(prior_result$reg_npmle$grid),
-               length.out = length.out)
-  df_invchi <- data.frame(
-    value = xgrid,
-    prob_curve = d_scaled_invchisq(xgrid, d0 =prior_result$reg_invchi$d0, s02 = prior_result$reg_invchi$v02)
-  )
-  
-  p <-  ggplot(df_npmle, aes(x = value, y = probability)) +
-    geom_segment(aes(xend = value, yend = 0, color = "Reg-NPMLE"),size = line_size) +
-    geom_line(data = df_invchi,aes(x = value, y = prob_curve, color = "Reg-Inv"),size = line_size, lineend = "round") +
-    labs(
-      x = expression(bold(tau^2)),
-      y = expression(bold(g(tau^2))),
-      #title = "Estimated prior with NPMLE_trend_1d",
-      color = NULL
-    ) +
-    scale_color_manual(
-      values = c( "Reg-Inv" = "mediumpurple4","Reg-NPMLE" = "lightcoral"),
-      breaks = c( "Reg-Inv","Reg-NPMLE"),
-      labels = c( expression(bold("Reg-Inv"*chi^2)),"Reg-NPMLE")
-    ) +
-    xlim(0,xlim_R)+
-    theme_minimal()
-  p
-}
 
 # Joint Prior
 make_joint_prior_plot <- function(prior_result){
@@ -368,45 +447,36 @@ E_logS2_given_Mi <- function(pep_grp, prior_byM, df1) {
   return(E_logS2_i)
 }
 
-make_trend_plot_mimic_joint <- function(info,prior_result,pep_grp,alpha,xlab,q=0.999){
+make_trend_plot_mimic_joint <- function(info,mimic_joint_npmle_prior,pep_grp){
   df<- info$df
-  E_logS2_Mi <- E_logS2_given_Mi(pep_grp, prior_result$mimic_joint_npmle, df)
-  log_var_fitted_untrended <- (log(prior_result$untrended_invchi$s02*prior_result$untrended_invchi$d0/info$df)
-                               +digamma(info$df/2)-digamma(prior_result$untrended_invchi$d0/2))
-  result_combined_df <- tibble(A = info$pep_num,
-                    log_sample_var = log(info$var),
-                    log_var_fitted = info$emean,
-                    E_log_S2 = E_logS2_Mi,
-                    log_var_fitted_untrended = log_var_fitted_untrended)
-  q_proteome <- quantile(result_combined_df$A, q)
-  trend_data_filt <- filter(result_combined_df, A <= q_proteome)
+  E_logS2_Mi <- E_logS2_given_Mi(pep_grp, mimic_joint_npmle_prior, df)
   
-  plot_trend <- ggplot(trend_data_filt, aes(x = A)) +
+  result_combined_df <- tibble(A = info$A,
+                    var = log(info$var),
+                    var_fitted = info$emean,
+                    E_S2 = E_logS2_Mi)
+  
+  
+  plot_trend <- ggplot(result_combined_df, aes(x = A)) +
     ## raw log-variance points (neutral, no legend)
-    geom_point(aes(y = log_sample_var), color = "#AAAAAA", alpha = alpha,shape=16,stroke = 0,size=1) +
+    geom_point(aes(y = var), color = "grey70", alpha = 0.6,shape=16,stroke = 0) +
     ## fitted trend line
-    geom_line(aes(y = log_var_fitted, group = 1, color = "Fitted trend"), size = 1.5,lineend = "round") +
+    geom_line(aes(y = var_fitted, group = 1, color = "Fitted trend"), linewidth = 1.2) +
   
     ## posterior expectation points (Joint NPMLE)
-    #geom_point(aes(y = E_S2), color = "lightblue",size = 0.5,alpha=0.5) +
-    geom_line(aes(y = E_log_S2, group = 1, color = "Joint-NPMLE"), size = 1.5,lineend = "round") +
-    geom_hline(
-      aes(yintercept = log_var_fitted_untrended, color = "Constant trend"),
-      size = 1.5,
-      linetype = "22"
-    ) +
+    geom_point(aes(y = E_S2), color = "lightblue",size = 0.5,alpha=0.5) +
+    geom_line(aes(y = E_S2, group = 1, color = "Joint-NPMLE"), linewidth = 1.2) +
     labs(
-       x = xlab,
-       y = expression(bold(log(S[i]^2))),
+       x = expression(bold(log[2](count))),
+       y = expression(bold(log(S^2))),
       color = NULL
     ) +
     scale_color_manual(
-      values = c( "Constant trend"="grey40", "Fitted trend" = "#D55E00","Joint-NPMLE" = "#377EB8"),
-      breaks = c( "Constant trend","Fitted trend","Joint-NPMLE"),
+      values = c( "Fitted trend" = "#FB8072","Joint-NPMLE" = "#377EB8"),
+      breaks = c( "Fitted trend","Joint-NPMLE"),
       name = NULL
     ) +
-    scale_x_continuous(trans = scales::log2_trans()) +
-    theme_classic(base_size = 10)
+    theme_minimal()
   
   plot_trend
 }
